@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * First-run onboarding, shaped exactly as specced by cxc:
+ * First-run onboarding, shape:
  * a Start page, then a top progress bar with three segments and two milestone dots,
  * with a live status line under it saying what is happening right now.
  *   segment 1 — environment setup (real installer steps drive the bar) → dot 1

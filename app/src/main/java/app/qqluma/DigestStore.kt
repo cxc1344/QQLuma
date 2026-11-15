@@ -7,7 +7,7 @@ import java.io.File
 data class DigestGroup(val id: String, val name: String, val enabled: Boolean)
 
 /**
- * Per-group digest （概括） mode state — the feature cxc asked to drive by instruction:
+ * Per-group digest （概括） mode state — per-group digest mode, driven by a single chat instruction:
  * he says one sentence in chat, the agent (DSH) calls the tool, and digest mode flips
  * for exactly that group.
  *

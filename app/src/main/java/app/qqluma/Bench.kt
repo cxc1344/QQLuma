@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 
 /**
 * The persistence test bench, kept as a section of the home screen until the real
-* Claude-style chat UI replaces it. It proves QQLuma's red lines on a real device:
+* The chat UI replaces it. It proves QQLuma's red lines on a real device:
 * sentinels written inside the rootfs and in /qqluma-data must survive app restarts,
 * process kills, and — the BotHive bug — damaged bookkeeping markers.
 */

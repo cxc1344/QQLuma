@@ -2,9 +2,7 @@
 
 一个住在手机本地隔离沙箱里的 QQ 助手：安卓 APK 内嵌一个**持久**的 Ubuntu 环境，
 里面跑 DSH 引擎（用户自配 API key）+ SnowLuma，管控一个独立 QQ 小号——进群、回消息、
-发说说、点赞，并可给指定群单独开「概括模式」。界面模仿 Claude。
-
-由 cxc 与 Muse 共创。先做可用的一版，再决定开源节奏。
+发说说、点赞，并可给指定群单独开「概括模式」。
 
 ## 为什么会有这个项目
 
@@ -47,14 +45,14 @@ APK (app.qqluma)
 - [ ] 真机验收持久化：重启 App、杀进程、标记损坏，哨兵与环境不丢
 - [ ] SnowLuma 入沙箱：Xvfb + arm64 QQ 扫码登录、会话稳住
 - [ ] DSH 入沙箱：用户配 key，经 OneBot 读到 QQ 消息
-- [ ] Claude 风正式 UI：配置向导（环境 → 扫码 → 配 key）+ 聊天界面 + 群概括模式
+- [ ] 正式 UI：配置向导（环境 → 扫码 → 配 key）+ 聊天界面 + 群概括模式
 
 ## 构建
 
 本项目不在普通开发机本地跑 Gradle 出包，走 GitHub Actions（见 `.github/workflows/build.yml`）：
 
 1. `bash tools/fetch_proot_android.sh` 拉取 PRoot 二进制到 jniLibs
-2. `gradle assembleDebug`（Gradle 8.7 / JDK 17 / compileSdk 35）
+2. `gradle assembleRelease`（Gradle 8.7 / JDK 17 / compileSdk 35）
 3. 可选固定签名：仓库 Secrets 配 `KEYSTORE_B64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
    `KEY_PASSWORD` 后，构建自动用项目密钥签名，保证新版能覆盖安装旧版
 

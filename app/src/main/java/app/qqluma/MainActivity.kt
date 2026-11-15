@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Entry point: first run goes through the onboarding wizard (Start → 环境 → 扫码 →
- * 配 Key → 欢迎使用）, afterwards the home screen. The Claude-style chat UI takes over
+ * 配 Key → 欢迎使用）, afterwards the home screen. The The chat UI takes over
  * the home screen once DSH moves into the sandbox (milestone 3).
  */
 class MainActivity : ComponentActivity() {
@@ -130,7 +130,7 @@ private fun HomeScreen(sandbox: Sandbox, onReconfigure: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "聊天主界面（Claude 风）随 DSH 入住沙箱后上线；现在先用下面的验收台验持久化。",
+            "聊天主界面随 DSH 入住沙箱后上线；现在先用下面的验收台验持久化。",
             style = MaterialTheme.typography.bodySmall
         )
         Spacer(Modifier.height(16.dp))
