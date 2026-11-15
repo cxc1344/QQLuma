@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The LaTeX heading face, both scripts: Latin Modern Roman (GUST e-foundry,
+     SIL OFL / GUST Font License) for Latin glyphs, falling through to Noto Serif SC
+     (GB2312 subset, same files BotHive bundles) for Chinese. Latin Modern alone has
+     no CJK glyphs — without the second pair, Chinese falls back to system sans. -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="400"
+        android:font="@font/latin_modern_regular" />
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="700"
+        android:font="@font/latin_modern_bold" />
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="400"
+        android:font="@font/cjk_serif_regular" />
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="700"
+        android:font="@font/cjk_serif_bold" />
+</font-family>
