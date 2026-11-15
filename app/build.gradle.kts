@@ -55,8 +55,11 @@ android {
 // large for the git tree: it is hosted as a release asset on this repo and
 // fetched at build time when missing (local builds that already have it in
 // src/main/assets/stack/ skip the download).
+// NOTE: the asset carries a ".pack" suffix on purpose — aapt2 silently
+// gunzips assets whose names end in .gz during packaging, which would hand
+// the app a raw tar under a different name.
 val snowLumaTar = layout.projectDirectory
-    .file("src/main/assets/stack/SnowLuma-v2.2.1-linux-arm64.tar.gz").asFile
+    .file("src/main/assets/stack/SnowLuma-v2.2.1-linux-arm64.tar.gz.pack").asFile
 val fetchSnowLuma by tasks.registering {
     onlyIf { !snowLumaTar.exists() }
     doLast {

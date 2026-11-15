@@ -130,12 +130,12 @@ class Sandbox(context: Context) {
                 if (name.endsWith(".sh")) out.setExecutable(true, false)
             }
             // The bundled SnowLuma tarball is ~52MB: copy it once, then only
-            // re-copy when the bundled size changes (app upgrade).
-            val tarName = "SnowLuma-v2.2.1-linux-arm64.tar.gz"
-            val tarOut = File(stackDir, tarName)
-            val bundledSize = app.assets.openFd("stack/$tarName").use { it.length }
-            if (!tarOut.exists() || tarOut.length() != bundledSize) {
-                app.assets.open("stack/$tarName").use { input ->
+            // re-copy when its size stops matching (app upgrade). The asset
+            // name ends in .pack because aapt2 gunzips *.gz assets while
+            // packaging; the guest-side file keeps the canonical .tar.gz name.
+            val tarOut = File(stackDir, "SnowLuma-v2.2.1-linux-arm64.tar.gz")
+            if (!tarOut.exists() || tarOut.length() != 52_110_194L) {
+                app.assets.open("stack/SnowLuma-v2.2.1-linux-arm64.tar.gz.pack").use { input ->
                     tarOut.outputStream().use { input.copyTo(it) }
                 }
             }
