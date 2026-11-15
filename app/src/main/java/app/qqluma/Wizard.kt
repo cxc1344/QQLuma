@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -401,6 +403,8 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
     var qrBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var qqState by remember { mutableStateOf("starting") }
     var stamp by remember { mutableStateOf(0L) }
+    var mode by remember { mutableStateOf("shot") }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { sandbox.ensureDataLayout() }
@@ -426,6 +430,13 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
     Column(Modifier.verticalScroll(rememberScrollState())) {
         Text("用小号扫这张码登录 QQ。码是沙箱里 QQ 窗口的实时截图，过期刷新会自动跟上。")
         Spacer(Modifier.height(16.dp))
+        Row {
+            FilterChip(selected = mode == "shot", onClick = { mode = "shot" }, label = { Text("截图码") })
+            Spacer(Modifier.width(8.dp))
+            FilterChip(selected = mode == "web", onClick = { mode = "web" }, label = { Text("网页桌面") })
+        }
+        Spacer(Modifier.height(12.dp))
+        if (mode == "shot") {
         val bmp = qrBitmap
         if (bmp != null) {
             Image(
@@ -456,6 +467,105 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
             },
             style = MaterialTheme.typography.bodySmall
         )
+        } else {
+            // Web desktop (noVNC): the guest desktop streamed into a WebView.
+            // Live and clickable, unlike the screenshot path. The pieces are
+            // installed on demand (vnc-install.sh); the resident supervisor
+            // starts x11vnc + websockify as soon as the binaries exist.
+            var vncState by remember { mutableStateOf("checking") }
+            var vncLog by remember { mutableStateOf("") }
+            var autoTried by remember { mutableStateOf(false) }
+            fun vncReachable(): Boolean = runCatching {
+                java.net.Socket().use { s ->
+                    s.connect(java.net.InetSocketAddress("127.0.0.1", 6080), 900)
+                    true
+                }
+            }.getOrDefault(false)
+            // Picking the web mode is enough: if the desktop service is up the
+            // page loads at once; if the pieces are missing they install
+            // automatically and the page follows as soon as the port answers.
+            LaunchedEffect(vncState) {
+                when (vncState) {
+                    "checking" -> {
+                        val ok = withContext(Dispatchers.IO) { vncReachable() }
+                        vncState = if (ok) "ready" else if (!autoTried) {
+                            autoTried = true
+                            "installing"
+                        } else "need"
+                    }
+                    "installing" -> {
+                        withContext(Dispatchers.IO) {
+                            sandbox.exec(
+                                "sh /qqluma-data/stack/vnc-install.sh",
+                                timeoutSec = 900,
+                                onLine = { line ->
+                                    vncLog = (vncLog + "\n" + line).takeLast(3000)
+                                }
+                            )
+                        }
+                        var ok = false
+                        repeat(14) {
+                            if (!ok) {
+                                ok = withContext(Dispatchers.IO) { vncReachable() }
+                                if (!ok) delay(2500)
+                            }
+                        }
+                        if (!ok) {
+                            vncLog = (vncLog + "\n（组件装完了但桌面服务还没起来，去控制台重启一次宿主再回来）").takeLast(3000)
+                        }
+                        vncState = if (ok) "ready" else "need"
+                    }
+                }
+            }
+            when (vncState) {
+                "ready" -> {
+                    AndroidView(
+                        factory = { c ->
+                            android.webkit.WebView(c).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                loadUrl("http://127.0.0.1:6080/vnc.html?autoconnect=true&resize=scale")
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(430.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "这就是沙箱桌面的实时画面，能直接点。QQ 窗口出来后，在里面用小号扫码登录。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                "installing" -> {
+                    Text("正在装网页桌面组件（走清华源），装完自动跳桌面…")
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1C1A17))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            vncLog.ifBlank { "（开始安装…）" },
+                            color = Color(0xFFF5F0E6),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                else -> {
+                    Text("网页桌面没能自动起来，看下面日志最后一行。要是组件装完了服务没起来，去控制台重启一次宿主再回来这个页面。")
+                    Spacer(Modifier.height(10.dp))
+                    Button(onClick = { vncState = "installing" }) { Text("重试") }
+                    if (vncLog.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(vncLog.takeLast(600), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(20.dp))
         Button(onClick = onDone) { Text("已扫码登录") }
         TextButton(onClick = onSkip) { Text("稍后再扫") }

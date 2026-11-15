@@ -40,6 +40,16 @@ start_qq() {
   echo "[stack] QQ launched"
 }
 
+start_vnc() {
+  x11vnc -display :100 -rfbport 5900 -localhost -forever -shared -nopw >>"$DATA/logs/vnc.log" 2>&1 &
+  echo "[stack] x11vnc launched"
+}
+
+start_vnc_web() {
+  websockify --web=/usr/share/novnc 127.0.0.1:6080 127.0.0.1:5900 >>"$DATA/logs/vnc-web.log" 2>&1 &
+  echo "[stack] noVNC web launched (http://127.0.0.1:6080/vnc.html)"
+}
+
 start_sl() {
   (
     cd "$DATA/app" && \
@@ -56,5 +66,12 @@ while true; do
   pgrep -f "/opt/QQ/qq" >/dev/null 2>&1 || start_qq
   pgrep -f "index.mjs" >/dev/null 2>&1 || start_sl
   pgrep -f "qr-watch.sh" >/dev/null 2>&1 || { sh "$STACK/qr-watch.sh" >>"$DATA/logs/qrwatch.log" 2>&1 & }
+  # Web desktop is optional: only when the vnc pieces are installed.
+  if command -v x11vnc >/dev/null 2>&1; then
+    pgrep -x x11vnc >/dev/null 2>&1 || start_vnc
+  fi
+  if command -v websockify >/dev/null 2>&1 && [ -d /usr/share/novnc ]; then
+    pgrep -f websockify >/dev/null 2>&1 || start_vnc_web
+  fi
   sleep 5
 done

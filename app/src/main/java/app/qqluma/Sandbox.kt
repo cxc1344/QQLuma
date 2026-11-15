@@ -122,7 +122,7 @@ class Sandbox(context: Context) {
         }
         runCatching {
             val stackDir = File(dataDir, "stack").apply { mkdirs() }
-            for (name in listOf("stack-install.sh", "stack-run.sh", "qr-watch.sh", "hook-shim.c")) {
+            for (name in listOf("stack-install.sh", "stack-run.sh", "qr-watch.sh", "hook-shim.c", "vnc-install.sh")) {
                 val out = File(stackDir, name)
                 app.assets.open("stack/$name").use { input ->
                     out.outputStream().use { input.copyTo(it) }
