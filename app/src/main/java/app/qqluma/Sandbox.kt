@@ -28,7 +28,12 @@ class Sandbox(context: Context) {
     /** The unpacked Ubuntu tree (guest /). */
     val rootfs: File = File(app.filesDir, "linux-rootfs/$ID")
 
-    fun exec(cmd: String, timeoutSec: Long = 120, onProgress: ((String) -> Unit)? = null): String {
+    fun exec(
+        cmd: String,
+        timeoutSec: Long = 120,
+        onProgress: ((String) -> Unit)? = null,
+        onLine: ((String) -> Unit)? = null
+    ): String {
         if (cmd.isBlank()) return "(空命令)"
         // Working-directory persistence across one-shot executions, same trick as BotHive:
         // the state file lives in the shared workspace so both sides see it.
@@ -49,7 +54,9 @@ class Sandbox(context: Context) {
                 workspace = dir,
                 dataDir = dataDir,
                 command = wrapped,
-                timeoutSec = timeoutSec
+                timeoutSec = timeoutSec,
+                onLine = onLine,
+                capSec = maxOf(180L, timeoutSec)
             )
         } catch (e: Exception) {
             Log.e("QQLumaLinux", "exec failed", e)
@@ -79,20 +86,32 @@ class Sandbox(context: Context) {
         }
     }
 
+    /** True once the guest stack (desktop + QQ + SnowLuma) finished installing. */
+    fun stackInstalled(): Boolean = File(dataDir, "snowluma/stack-installed").isFile
+
+    /** Host-side handle on the live QR screenshot the guest watcher publishes. */
+    fun qrImageFile(): File = File(dataDir, "snowluma/qr.png")
+
+    /** Latest guest-published login status JSON ({"qq":...,"w":..,"h":..,"ts":..}). */
+    fun qrStatusJson(): String? =
+        runCatching { File(dataDir, "snowluma/status.json").readText().trim() }.getOrNull()
+
     /**
-     * Creates the data-dir layout and a default host-init.sh (the resident host's entry
-     * point) when absent. The init script encodes the SnowLuma launch contract learned from
-     * the mature astrbot-for-android-snowluma project: HOME/XDG live under /qqluma-data so
-     * the QQ session survives rootfs rebuilds, and the hook autoload stays off so the QQ
-     * session is never hooked twice. Never overwrites an existing host-init.sh.
+     * Creates the data-dir layout and installs the app-owned guest scripts:
+     * bin/qqluma-digest, the stack scripts under stack/, and host-init.sh (the resident
+     * host's entry point). All of these are ours, so an app upgrade refreshes them; the
+     * user's session data (snowluma/home, dsh config) is never touched here.
+     *
+     * host-init.sh contract: when the stack is installed it hands over to stack-run.sh
+     * (Xvfb + QQ with the hook shim + SnowLuma, HOME/XDG under /qqluma-data so the QQ
+     * session survives rootfs rebuilds); otherwise it just parks so the supervisor's
+     * resident process stays alive.
      */
     fun ensureDataLayout() {
         dataDir.mkdirs()
         File(dataDir, "snowluma/home").mkdirs()
         File(dataDir, "dsh").mkdirs()
         File(dataDir, "logs").mkdirs()
-        // Install/refresh the agent's command-line tools into the data dir (ours, so an
-        // app upgrade may overwrite them — unlike the user's host-init.sh below).
         runCatching {
             val binDir = File(dataDir, "bin").apply { mkdirs() }
             val tool = File(binDir, "qqluma-digest")
@@ -101,29 +120,29 @@ class Sandbox(context: Context) {
             }
             tool.setExecutable(true, false)
         }
-        val init = File(dataDir, "host-init.sh")
-        if (!init.exists()) {
-            init.writeText(
-                """
-                #!/bin/sh
-                # QQLuma resident init: runs inside the sandbox at every host start.
-                # Output lands in /qqluma-data/host.log on the host side.
-                set -e
-                mkdir -p /qqluma-data/snowluma/home /qqluma-data/dsh /qqluma-data/logs
-                echo "[host-init] ${'$'}(date) resident up"
-                # --- SnowLuma (milestone 2; PIN v2.2.1: the v2.3.x hook crashes Linux QQ
-                # 3.2.34 on PRoot) ---
-                # export HOME=/qqluma-data/snowluma/home
-                # export XDG_CONFIG_HOME=${'$'}HOME/.config
-                # export XDG_DATA_HOME=${'$'}HOME/.local/share
-                # export XDG_CACHE_HOME=${'$'}HOME/.cache
-                # export SNOWLUMA_HOOK_AUTOLOAD=0
-                # export SNOWLUMA_WEBUI_HOST=127.0.0.1
-                # export SNOWLUMA_WEBUI_PORT=5099
-                # Launch happens once the desktop/QQ session exists; see GOAL.md milestone 2.
-                """.trimIndent() + "\n"
-            )
+        runCatching {
+            val stackDir = File(dataDir, "stack").apply { mkdirs() }
+            for (name in listOf("stack-install.sh", "stack-run.sh", "qr-watch.sh", "hook-shim.c")) {
+                val out = File(stackDir, name)
+                app.assets.open("stack/$name").use { input ->
+                    out.outputStream().use { input.copyTo(it) }
+                }
+                if (name.endsWith(".sh")) out.setExecutable(true, false)
+            }
         }
+        File(dataDir, "host-init.sh").writeText(
+            """
+            #!/bin/sh
+            # QQLuma resident init (app-managed; refreshed on upgrade).
+            mkdir -p /qqluma-data/snowluma/home /qqluma-data/dsh /qqluma-data/logs
+            echo "[host-init] resident up"
+            if [ -f /qqluma-data/snowluma/stack-installed ]; then
+              exec sh /qqluma-data/stack/stack-run.sh
+            fi
+            echo "[host-init] stack not installed yet; parking"
+            exec sleep infinity
+            """.trimIndent() + "\n"
+        )
     }
 
     /**

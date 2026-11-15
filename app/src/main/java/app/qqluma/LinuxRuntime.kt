@@ -82,7 +82,9 @@ internal object LinuxRuntime {
         workspace: File,
         dataDir: File,
         command: String,
-        timeoutSec: Long
+        timeoutSec: Long,
+        onLine: ((String) -> Unit)? = null,
+        capSec: Long = 180
     ): String {
         val abi = supported.firstOrNull { it.android in Build.SUPPORTED_ABIS }
             ?: throw LinuxSetupException(
@@ -110,7 +112,7 @@ internal object LinuxRuntime {
                 throw IOException("Linux 并发任务已满，请稍后重试")
             }
             try {
-                return runProot(context, botId, proot, loader, rootfs, workspace, dataDir, command, timeoutSec)
+                return runProot(context, botId, proot, loader, rootfs, workspace, dataDir, command, timeoutSec, onLine, capSec)
             } finally {
                 processSlots.release()
             }
@@ -471,12 +473,14 @@ internal object LinuxRuntime {
         workspace: File,
         dataDir: File,
         command: String,
-        timeoutSec: Long
+        timeoutSec: Long,
+        onLine: ((String) -> Unit)? = null,
+        capSec: Long = 180
     ): String {
-        val first = runProotOnce(context, botId, proot, loader, rootfs, workspace, dataDir, command, timeoutSec, seccompDisabled)
+        val first = runProotOnce(context, botId, proot, loader, rootfs, workspace, dataDir, command, timeoutSec, seccompDisabled, capSec = capSec, onLine = onLine)
         if (!seccompDisabled && looksSeccompRelated(first)) {
             // Some kernels/ROMs reject PRoot's seccomp acceleration; retry once without it (the guest command never ran).
-            val second = runProotOnce(context, botId, proot, loader, rootfs, workspace, dataDir, command, timeoutSec, true)
+            val second = runProotOnce(context, botId, proot, loader, rootfs, workspace, dataDir, command, timeoutSec, true, capSec = capSec, onLine = onLine)
             if (!prootItselfFailed(second)) {
                 seccompDisabled = true
                 return render(second) + "\n[PRoot 已自动改用 PROOT_NO_SECCOMP=1]"
@@ -497,7 +501,8 @@ internal object LinuxRuntime {
         command: String,
         timeoutSec: Long,
         noSeccomp: Boolean,
-        capSec: Long = 180
+        capSec: Long = 180,
+        onLine: ((String) -> Unit)? = null
     ): ProotRun {
         val temp = File(context.cacheDir, "proot-tmp/$botId").apply { mkdirs() }
         val args = ProotArgs.build(proot.absolutePath, rootfs.absolutePath, workspace.canonicalPath, dataDir.canonicalPath, command)
@@ -526,16 +531,31 @@ internal object LinuxRuntime {
             )
         }
         val output = StringBuilder()
+        val cap = if (onLine != null) 400_000 else 20_000
         val reader = Thread {
             try {
                 process.inputStream.bufferedReader().use { r ->
                     val buf = CharArray(1024)
+                    val partial = StringBuilder()
                     while (true) {
                         val n = r.read(buf)
                         if (n < 0) break
                         synchronized(output) {
-                            if (output.length < 20_000) output.append(buf, 0, n)
+                            if (output.length < cap) output.append(buf, 0, n)
                         }
+                        if (onLine != null) {
+                            partial.append(buf, 0, n)
+                            var nl = partial.indexOf("\n")
+                            while (nl >= 0) {
+                                val line = partial.substring(0, nl).trimEnd('\r')
+                                partial.delete(0, nl + 1)
+                                runCatching { onLine(line) }
+                                nl = partial.indexOf("\n")
+                            }
+                        }
+                    }
+                    if (onLine != null && partial.isNotEmpty()) {
+                        runCatching { onLine(partial.toString().trimEnd('\r')) }
                     }
                 }
             } catch (_: Exception) {

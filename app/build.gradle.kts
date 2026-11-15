@@ -11,8 +11,8 @@ android {
         applicationId = "app.qqluma"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
     // Fixed signing for CI builds (same scheme as BotHive): when KEYSTORE_FILE is present
     // in the environment, builds are signed with the project keystore provided through CI
