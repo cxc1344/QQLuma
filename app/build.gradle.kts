@@ -1,3 +1,5 @@
+import java.net.URL
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -62,7 +64,7 @@ val fetchSnowLuma by tasks.registering {
         val url = "https://github.com/cxc1344/QQLuma/releases/download/" +
             "snowluma-2.2.1/SnowLuma-v2.2.1-linux-arm64.tar.gz"
         val tmp = File(snowLumaTar.parentFile, snowLumaTar.name + ".part")
-        java.net.URL(url).openStream().use { input ->
+        URL(url).openStream().use { input ->
             tmp.outputStream().use { input.copyTo(it) }
         }
         check(tmp.length() == 52_110_194L) { "SnowLuma tarball size mismatch" }
