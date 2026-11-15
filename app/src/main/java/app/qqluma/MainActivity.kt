@@ -66,9 +66,23 @@ class MainActivity : ComponentActivity() {
             ) {
                 Surface(Modifier.fillMaxSize()) {
                     var onboarded by remember { mutableStateOf(AppConfig.isOnboarded(this)) }
+                    // The wizard only counts as done once the guest stack is really
+                    // installed: an upgraded install that finished the old wizard
+                    // (flag set) but never ran the stack installer must land back
+                    // in the wizard, not straight in the chat.
+                    var stackReady by remember {
+                        mutableStateOf(
+                            java.io.File(sandbox.dataDir, "snowluma/stack-installed").exists()
+                        )
+                    }
                     var showConsole by remember { mutableStateOf(false) }
                     when {
-                        !onboarded -> OnboardingWizard(sandbox) { onboarded = true }
+                        !(onboarded && stackReady) -> OnboardingWizard(sandbox) {
+                            onboarded = true
+                            stackReady = java.io.File(
+                                sandbox.dataDir, "snowluma/stack-installed"
+                            ).exists()
+                        }
                         showConsole -> ConsoleScreen(
                             sandbox,
                             onBack = { showConsole = false },
