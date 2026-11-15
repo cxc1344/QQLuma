@@ -11,8 +11,8 @@ android {
         applicationId = "app.qqluma"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.2"
+        versionCode = 5
+        versionName = "1.1.3"
     }
     // Fixed signing for CI builds (same scheme as BotHive): when KEYSTORE_FILE is present
     // in the environment, builds are signed with the project keystore provided through CI
@@ -48,6 +48,28 @@ android {
         jniLibs { useLegacyPackaging = true }
     }
 }
+
+// The SnowLuma v2.2.1 runtime tarball (~52MB) is bundled as an asset but is too
+// large for the git tree: it is hosted as a release asset on this repo and
+// fetched at build time when missing (local builds that already have it in
+// src/main/assets/stack/ skip the download).
+val snowLumaTar = layout.projectDirectory
+    .file("src/main/assets/stack/SnowLuma-v2.2.1-linux-arm64.tar.gz").asFile
+val fetchSnowLuma by tasks.registering {
+    onlyIf { !snowLumaTar.exists() }
+    doLast {
+        snowLumaTar.parentFile.mkdirs()
+        val url = "https://github.com/cxc1344/QQLuma/releases/download/" +
+            "snowluma-2.2.1/SnowLuma-v2.2.1-linux-arm64.tar.gz"
+        val tmp = File(snowLumaTar.parentFile, snowLumaTar.name + ".part")
+        java.net.URL(url).openStream().use { input ->
+            tmp.outputStream().use { input.copyTo(it) }
+        }
+        check(tmp.length() == 52_110_194L) { "SnowLuma tarball size mismatch" }
+        tmp.renameTo(snowLumaTar)
+    }
+}
+tasks.named("preBuild") { dependsOn(fetchSnowLuma) }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.09.03"))
