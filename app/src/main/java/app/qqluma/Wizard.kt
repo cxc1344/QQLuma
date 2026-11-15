@@ -474,9 +474,8 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
                         val base = sandbox.dataDir
                         fun tail(rel: String, n: Int = 45): String {
                             val f = java.io.File(base, rel)
-                            if (!f.isFile) return "(无 $rel)"
-                            val lines = runCatching { f.readLines() }.getOrElse { return "(读不了 $rel)" }
-                            lines.takeLast(n).joinToString("\n")
+                            val lines = if (f.isFile) runCatching { f.readLines() }.getOrNull() else null
+                            return lines?.takeLast(n)?.joinToString("\n") ?: "(无或读不了 $rel)"
                         }
                         buildString {
                             append("=== status.json ===\n")
