@@ -144,6 +144,9 @@ fun OnboardingWizard(sandbox: Sandbox, onFinished: () -> Unit) {
         stepLabels.clear()
         logLines.clear()
         status = "正在准备环境…"
+        // Refresh the app-owned guest scripts (stack installer, host-init) before any
+        // exec needs them — on an upgrade this is the first run of the new code.
+        withContext(Dispatchers.IO) { sandbox.ensureDataLayout() }
         val envOut = withContext(Dispatchers.IO) {
             sandbox.exec("echo GUEST_OK && uname -a", onProgress = { line ->
                 status = line
