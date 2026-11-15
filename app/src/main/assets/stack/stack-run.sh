@@ -22,6 +22,13 @@ echo "[stack] resident starting (display :100)"
 x_ready() { xdpyinfo -display :100 >/dev/null 2>&1; }
 
 start_x() {
+  # A previous resident may have died leaving /tmp/.X100-lock and a dead
+  # socket behind in the persistent rootfs. Xvfb then refuses to start
+  # ("Server is already active for display 100") forever, while nothing
+  # actually serves the display — and QQ/x11vnc/scrot all starve. We only
+  # get here when the display is NOT answering, so the lock is stale by
+  # definition: clear it before starting.
+  rm -f /tmp/.X100-lock /tmp/.X11-unix/X100
   Xvfb :100 -screen 0 900x1600x24 >>"$DATA/logs/xvfb.log" 2>&1 &
   i=0
   while [ $i -lt 20 ]; do
