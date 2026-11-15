@@ -486,6 +486,8 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
                             append(tail("snowluma/logs/qq.log")).append("\n")
                             append("=== snowluma.log ===\n")
                             append(tail("snowluma/logs/snowluma.log")).append("\n")
+                            append("=== qrwatch.log ===\n")
+                            append(tail("snowluma/logs/qrwatch.log", 20)).append("\n")
                             append("=== xvfb.log ===\n")
                             append(tail("snowluma/logs/xvfb.log", 15))
                         }
