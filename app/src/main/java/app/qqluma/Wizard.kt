@@ -451,6 +451,7 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
             when (qqState) {
                 "hooked" -> "已和 QQ 接上头，扫码后等它上线。"
                 "window" -> "等待扫码…（${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date(stamp))} 刷新）"
+                "desktop" -> "桌面已经起来了，QQ 窗口还没出现，下面是桌面实时画面。再等一会儿，还不出就展开日志看看。"
                 else -> "QQ 正在启动，码马上就来。"
             },
             style = MaterialTheme.typography.bodySmall
@@ -458,5 +459,54 @@ private fun ScanStage(sandbox: Sandbox, onDone: () -> Unit, onSkip: () -> Unit) 
         Spacer(Modifier.height(20.dp))
         Button(onClick = onDone) { Text("已扫码登录") }
         TextButton(onClick = onSkip) { Text("稍后再扫") }
+
+        // Guest logs, for when the code does not show up: host.log plus the
+        // per-component logs the resident stack writes under snowluma/logs/.
+        var showLogs by remember { mutableStateOf(false) }
+        var logsText by remember { mutableStateOf("") }
+        TextButton(onClick = { showLogs = !showLogs }) {
+            Text(if (showLogs) "收起日志" else "查看日志（码不出来时点这个）")
+        }
+        if (showLogs) {
+            LaunchedEffect(Unit) {
+                while (true) {
+                    logsText = withContext(Dispatchers.IO) {
+                        val base = sandbox.dataDir
+                        fun tail(rel: String, n: Int = 45): String {
+                            val f = java.io.File(base, rel)
+                            if (!f.isFile) return "(无 $rel)"
+                            val lines = runCatching { f.readLines() }.getOrElse { return "(读不了 $rel)" }
+                            lines.takeLast(n).joinToString("\n")
+                        }
+                        buildString {
+                            append("=== status.json ===\n")
+                            append(tail("snowluma/status.json", 3)).append("\n")
+                            append("=== host.log ===\n")
+                            append(tail("host.log")).append("\n")
+                            append("=== qq.log ===\n")
+                            append(tail("snowluma/logs/qq.log")).append("\n")
+                            append("=== snowluma.log ===\n")
+                            append(tail("snowluma/logs/snowluma.log")).append("\n")
+                            append("=== xvfb.log ===\n")
+                            append(tail("snowluma/logs/xvfb.log", 15))
+                        }
+                    }
+                    delay(3000)
+                }
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1C1A17))
+                    .padding(10.dp)
+            ) {
+                Text(
+                    logsText.ifBlank { "（读取中…）" },
+                    color = Color(0xFFF5F0E6),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
     }
 }

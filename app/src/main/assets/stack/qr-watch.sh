@@ -14,7 +14,16 @@ write_status() {
 
 while true; do
   WID=$(xdotool search --name "QQ" 2>/dev/null | head -n 1)
-  if [ -n "$WID" ]; then
+  [ -z "$WID" ] && WID=$(xdotool search --class "qq" 2>/dev/null | head -n 1)
+  [ -z "$WID" ] && WID=$(xdotool search --onlyvisible --name "." 2>/dev/null | head -n 1)
+  if [ -z "$WID" ] && xdpyinfo -display :100 >/dev/null 2>&1; then
+    # Desktop is up but no window matched: publish a full-screen shot so the
+    # phone shows whatever is on the desktop instead of a blind "starting".
+    if scrot -o "$DATA/qr.png.tmp" 2>/dev/null; then
+      mv "$DATA/qr.png.tmp" "$DATA/qr.png"
+    fi
+    write_status "desktop" 900 1600
+  elif [ -n "$WID" ]; then
     GEO=$(xwininfo -id "$WID" 2>/dev/null | awk '
       /Absolute upper-left X:/ {x=$NF}
       /Absolute upper-left Y:/ {y=$NF}
