@@ -41,11 +41,13 @@ start_qq() {
 }
 
 start_vnc() {
-  x11vnc -display :100 -rfbport 5900 -localhost -forever -shared -nopw >>"$DATA/logs/vnc.log" 2>&1 &
+  echo "[stack $(date +%H:%M:%S)] starting x11vnc" >>"$DATA/logs/vnc.log"
+  x11vnc -display :100 -rfbport 5900 -listen 127.0.0.1 -noipv6 -forever -shared -nopw -noxdamage >>"$DATA/logs/vnc.log" 2>&1 &
   echo "[stack] x11vnc launched"
 }
 
 start_vnc_web() {
+  echo "[stack $(date +%H:%M:%S)] starting websockify" >>"$DATA/logs/vnc-web.log"
   websockify --web=/usr/share/novnc 127.0.0.1:6080 127.0.0.1:5900 >>"$DATA/logs/vnc-web.log" 2>&1 &
   echo "[stack] noVNC web launched (http://127.0.0.1:6080/vnc.html)"
 }
